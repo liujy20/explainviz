@@ -1,0 +1,40 @@
+<div id="visual-example">
+  <div class="viz-controls">
+    <label class="form-label" for="example-value"><span>数值</span><output id="example-output" class="tabular-nums" aria-live="polite">50</output>
+      <input class="form-range" id="example-value" type="range" min="0" max="100" value="50">
+    </label>
+  </div>
+  <svg viewBox="0 0 300 60" role="img" aria-label="数值对应的长度" style="width:100%;height:auto">
+    <rect x="0" y="15" width="300" height="30" fill="var(--muted)"></rect>
+    <rect id="example-bar" x="0" y="15" width="150" height="30" fill="var(--viz-series-1)"></rect>
+  </svg>
+</div>
+<script>
+(() => {
+  const root = document.getElementById('visual-example');
+  const input = root.querySelector('#example-value');
+  const output = root.querySelector('#example-output');
+  const bar = root.querySelector('#example-bar');
+  function render(value) {
+    const valid = typeof value === 'number' && Number.isFinite(value);
+    const next = valid ? Math.max(0, Math.min(100, value)) : 50;
+    input.value = String(next);
+    output.value = String(next);
+    bar.setAttribute('width', String(next * 3));
+  }
+  function restore(snapshot) {
+    render(snapshot?.modelContent?.value);
+  }
+  restore(window.openai?.widgetState);
+  window.addEventListener('openai:set_globals', event => {
+    const globals = event.detail?.globals;
+    if (globals && Object.prototype.hasOwnProperty.call(globals, 'widgetState')) {
+      restore(globals.widgetState);
+    }
+  });
+  input.addEventListener('input', () => render(Number(input.value)));
+  input.addEventListener('change', () => {
+    window.openai?.setWidgetState?.({modelContent: {value: Number(input.value)}, privateContent: null})?.catch(() => {});
+  });
+})();
+</script>

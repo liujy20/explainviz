@@ -1,0 +1,19 @@
+<section id="geometry-d3-node" aria-labelledby="geometry-title">
+  <h2 id="geometry-title">Polygon with a hole</h2>
+  <p id="geometry-summary">D3 draws the paths and scales; polygon-clipping is available for boolean geometry.</p>
+  <svg viewBox="0 0 640 360" role="img" aria-labelledby="geometry-title geometry-summary"></svg>
+  <script type="module">
+    const root = document.getElementById("geometry-d3-node");
+    const svg = root.querySelector("svg");
+    const d3 = await import("https://esm.sh/d3@7.9.0");
+    const clipping = await import("https://esm.sh/polygon-clipping@0.15.7");
+    const x = d3.scaleLinear().domain([0, 10]).range([80, 560]);
+    const y = d3.scaleLinear().domain([0, 6]).range([300, 60]);
+    const line = d3.line().x(([px]) => x(px)).y(([, py]) => y(py));
+    const outer = [[0, 0], [10, 0], [10, 6], [0, 6], [0, 0]];
+    const hole = [[3, 2], [7, 2], [7, 4], [3, 4], [3, 2]];
+    svg.innerHTML = `<path d="${line(outer)}Z ${line(hole)}Z" fill="#b9d4ec" fill-rule="evenodd" stroke="#24577a" stroke-width="4"/>` +
+      `<text x="320" y="112" text-anchor="middle">outer ring</text><text x="320" y="188" text-anchor="middle">hole</text>`;
+    root.dataset.polygonClipping = typeof clipping.union;
+  </script>
+</section>

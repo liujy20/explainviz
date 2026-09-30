@@ -1,0 +1,33 @@
+<section id="router-mermaid-node" aria-labelledby="router-mermaid-title">
+  <h2 id="router-mermaid-title">Visual explanation routing</h2>
+  <p id="router-mermaid-description" class="sr-only">
+    A static Mermaid flow showing how the router selects a visualization branch.
+  </p>
+  <div class="mermaid" role="img" aria-labelledby="router-mermaid-title router-mermaid-description">
+flowchart LR
+  request["User request"] --> goal{"What is the delivery goal?"}
+  goal -->|"Conversation exploration"| visualize["visualize: HTML or Mermaid"]
+  goal -->|"Geometry or spatial counterexample"| geometry["geometry: coordinate diagram"]
+  goal -->|"Design document or source to diagram"| design["design-doc-mermaid: source and validation"]
+  visualize --> explain["Brief explanation and boundary notes"]
+  geometry --> explain
+  design --> explain
+  </div>
+  <details>
+    <summary>Mermaid source</summary>
+    <pre data-mermaid><code>flowchart LR
+  request["User request"] --> goal{"What is the delivery goal?"}
+  goal -->|"Conversation exploration"| visualize["visualize: HTML or Mermaid"]
+  goal -->|"Geometry or spatial counterexample"| geometry["geometry: coordinate diagram"]
+  goal -->|"Design document or source to diagram"| design["design-doc-mermaid: source and validation"]
+  visualize --> explain["Brief explanation and boundary notes"]
+  geometry --> explain
+  design --> explain</code></pre>
+  </details>
+  <script type="module">
+    const root = document.getElementById("router-mermaid-node");
+    const mermaid = await import("https://cdn.jsdelivr.net/npm/mermaid@11.12.2/dist/mermaid.esm.min.mjs");
+    mermaid.default.initialize({ startOnLoad: false, securityLevel: "strict" });
+    await mermaid.default.run({ nodes: [root.querySelector(".mermaid")] });
+  </script>
+</section>
