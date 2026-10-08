@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>马鞍面</title>
+  <style>
+    :root { color-scheme: light dark; --background: #fff; --foreground: #252525; --muted: #f4f5f6; --muted-foreground: #656565; --border: #d7dadd; }
+    @media (prefers-color-scheme: dark) { :root { --background: #171819; --foreground: #eee; --muted: #242627; --muted-foreground: #aaa; --border: #505356; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 16px; background: var(--background); color: var(--foreground); font: 14px system-ui, sans-serif; }
+    main { max-width: 960px; margin: auto; }
+    h1 { font-size: 20px; margin: 0 0 12px; }
+    .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; }
+    label { display: flex; align-items: center; gap: 6px; min-height: 44px; }
+    select, button { min-height: 44px; padding: 8px; color: inherit; background: var(--muted); border: 1px solid var(--border); border-radius: 4px; font: inherit; }
+    select { font-size: 16px; max-width: 155px; }
+    button { width: 44px; display: grid; place-items: center; }
+    button svg { width: 18px; height: 18px; }
+    input { width: 18px; height: 18px; accent-color: #087d89; }
+    :focus-visible { outline: 2px solid #087d89; outline-offset: 3px; }
+    #scene { width: 100%; height: 540px; height: min(65svh, 540px); min-height: 320px; position: relative; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+    #scene:focus-visible { outline-offset: -3px; }
+    #error { color: #c03930; }
+    .equation { margin: 8px 0 0; color: var(--muted-foreground); font-size: 12px; }
+  </style>
+  <script type="importmap">
+    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/","lucide/":"https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/esm/"}}
+  </script>
+</head>
+<body>
+  <main>
+    <h1>马鞍面</h1>
+    <div class="toolbar">
+      <label for="view">视角 <select id="view"><option value="free">自由</option><option value="xy">XY</option><option value="xz">XZ</option><option value="yz">YZ</option></select></label>
+      <label for="grid"><input id="grid" type="checkbox" checked>坐标网格</label>
+      <button id="reset" type="button" aria-label="复位视角" title="复位视角"><span aria-hidden="true">&#8634;</span></button>
+    </div>
+    <div id="scene" tabindex="0" role="region" aria-label="可旋转的三维马鞍面，等比例右手坐标系"></div>
+    <p class="equation">z = (x² − y²) / 4；x, y ∈ [−2, 2]；右手坐标系，三轴同单位。</p>
+    <p id="error" role="alert" hidden></p>
+  </main>
+  <script type="module">
+    const host = document.getElementById('scene');
+    const view = document.getElementById('view');
+    const gridInput = document.getElementById('grid');
+    const error = document.getElementById('error');
+    try {
+      const [THREE, { OrbitControls }, { ParametricGeometry }, { default: createElement }, { default: RotateCcw }] = await Promise.all([
+        import('three'), import('three/addons/controls/OrbitControls.js'),
+        import('three/addons/geometries/ParametricGeometry.js'), import('lucide/createElement.js'), import('lucide/icons/rotate-ccw.js')
+      ]);
+      document.getElementById('reset').replaceChildren(createElement(RotateCcw));
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+      camera.up.set(0, 0, 1);
+      const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      host.append(renderer.domElement);
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enablePan = false;
+      controls.minDistance = 3;
+      controls.maxDistance = 40;
+      controls.target.set(0, 0, 0);
+      controls.addEventListener('start', () => { view.value = 'free'; });
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x626262, 2.5));
+      const light = new THREE.DirectionalLight(0xffffff, 3);
+      light.position.set(3, -4, 6);
+      scene.add(light);
+      const geometry = new ParametricGeometry((u, v, target) => {
+        const x = 4 * u - 2, y = 4 * v - 2;
+        target.set(x, y, (x * x - y * y) / 4);
+      }, 48, 48);
+      const surface = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0x109ca4, side: THREE.DoubleSide, roughness: 0.65 }));
+      scene.add(surface);
+      const wire = new THREE.LineSegments(new THREE.WireframeGeometry(new ParametricGeometry((u, v, target) => {
+        const x = 4 * u - 2, y = 4 * v - 2;
+        target.set(x, y, (x * x - y * y) / 4);
+      }, 12, 12)), new THREE.LineBasicMaterial({ color: 0x164c50, transparent: true, opacity: 0.2 }));
+      scene.add(wire);
+      const grid = new THREE.Group();
+      scene.add(grid);
+      const gridPoints = [];
+      const segment = (a, b) => gridPoints.push(...a, ...b);
+      for (let n = -2; n <= 2; n += 0.5) {
+        segment([n, -2, -1.5], [n, 2, -1.5]);
+        segment([-2, n, -1.5], [2, n, -1.5]);
+        segment([-2, n, -1.5], [-2, n, 1.5]);
+        segment([n, 2, -1.5], [n, 2, 1.5]);
+      }
+      for (let z = -1.5; z <= 1.5; z += 0.5) {
+        segment([-2, -2, z], [-2, 2, z]);
+        segment([-2, 2, z], [2, 2, z]);
+      }
+      const gridMaterial = new THREE.LineBasicMaterial({ transparent: true, opacity: 0.32 });
+      const gridGeometry = new THREE.BufferGeometry();
+      gridGeometry.setAttribute('position', new THREE.Float32BufferAttribute(gridPoints, 3));
+      grid.add(new THREE.LineSegments(gridGeometry, gridMaterial));
+      const boxGeometry = new THREE.BoxGeometry(4, 4, 3);
+      const boxMaterial = new THREE.LineBasicMaterial({ transparent: true, opacity: 0.55 });
+      grid.add(new THREE.LineSegments(new THREE.EdgesGeometry(boxGeometry), boxMaterial));
+      boxGeometry.dispose();
+      const labels = [];
+      const theme = matchMedia('(prefers-color-scheme: dark)');
+      function label(text, position) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 128; canvas.height = 64;
+        const texture = new THREE.CanvasTexture(canvas);
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true }));
+        sprite.position.set(...position);
+        sprite.renderOrder = 2;
+        grid.add(sprite);
+        labels.push({ canvas, texture, sprite, text });
+      }
+      for (const n of [-2, 0, 2]) {
+        label(String(n), [n, -2.25, -1.6]);
+        label(String(n), [2.25, n, -1.6]);
+      }
+      for (const n of [-1, 0, 1]) label(String(n), [-2.25, 2, n]);
+      label('x', [1, -2.5, -1.6]); label('y', [2.5, 1, -1.6]); label('z', [-2.25, 2, 1.75]);
+      function updateTheme() {
+        renderer.setClearColor(theme.matches ? 0x171819 : 0xffffff);
+        gridMaterial.color.set(theme.matches ? 0xaeb4b8 : 0x7a8389);
+        boxMaterial.color.copy(gridMaterial.color);
+        for (const { canvas, texture, text } of labels) {
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.font = '28px system-ui, sans-serif';
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillStyle = theme.matches ? '#b7bdc2' : '#626970';
+          ctx.fillText(text, 64, 32);
+          texture.needsUpdate = true;
+        }
+      }
+      theme.addEventListener('change', updateTheme);
+      updateTheme();
+      // Fixed bounds include labels; fitting must not depend on distance-scaled sprites.
+      const bounds = new THREE.Box3(new THREE.Vector3(-2.6, -2.6, -1.9), new THREE.Vector3(2.6, 2.6, 2));
+      const radius = bounds.getBoundingSphere(new THREE.Sphere()).radius;
+      function fit() {
+        const direction = camera.position.clone().sub(controls.target).normalize();
+        const halfFov = THREE.MathUtils.degToRad(camera.fov / 2);
+        const halfAngle = Math.min(halfFov, Math.atan(Math.tan(halfFov) * camera.aspect));
+        const distance = radius / Math.sin(halfAngle) * 1.08;
+        controls.maxDistance = Math.max(40, distance * 2);
+        camera.far = controls.maxDistance + radius * 2;
+        camera.position.copy(direction.multiplyScalar(distance).add(controls.target));
+        camera.updateProjectionMatrix();
+        controls.update();
+      }
+      function setView(value) {
+        camera.up.set(0, 0, 1);
+        if (value === 'xy') camera.up.set(0, 1, 0);
+        const directions = { free: [6, -8, 6], xy: [0, 0, 1], xz: [0, -1, 0], yz: [1, 0, 0] };
+        camera.position.set(...directions[value]);
+        fit();
+        view.value = value;
+      }
+      view.addEventListener('change', () => setView(view.value));
+      gridInput.addEventListener('change', () => { grid.visible = gridInput.checked; });
+      document.getElementById('reset').addEventListener('click', () => setView('free'));
+      host.addEventListener('keydown', event => {
+        const step = Math.PI / 36;
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+          event.preventDefault();
+          const offset = camera.position.clone().sub(controls.target);
+          const rotation = new THREE.Quaternion().setFromUnitVectors(camera.up, new THREE.Vector3(0, 1, 0));
+          const spherical = new THREE.Spherical().setFromVector3(offset.applyQuaternion(rotation));
+          if (event.key === 'ArrowLeft') spherical.theta -= step;
+          if (event.key === 'ArrowRight') spherical.theta += step;
+          if (event.key === 'ArrowUp') spherical.phi -= step;
+          if (event.key === 'ArrowDown') spherical.phi += step;
+          spherical.makeSafe();
+          offset.setFromSpherical(spherical).applyQuaternion(rotation.invert());
+          camera.position.copy(controls.target).add(offset);
+          view.value = 'free'; controls.update();
+        } else if (event.key === '+' || event.key === '-') {
+          event.preventDefault();
+          const offset = camera.position.clone().sub(controls.target);
+          offset.setLength(THREE.MathUtils.clamp(offset.length() * (event.key === '+' ? 0.9 : 1.1), controls.minDistance, controls.maxDistance));
+          camera.position.copy(controls.target).add(offset); controls.update();
+        }
+      });
+      camera.position.set(6, -8, 6);
+      new ResizeObserver(() => {
+        const { width, height } = host.getBoundingClientRect();
+        renderer.setSize(width, height);
+        camera.aspect = width / height;
+        fit();
+      }).observe(host);
+      renderer.setAnimationLoop(() => {
+        for (const { sprite } of labels) {
+          const depth = sprite.position.clone().sub(camera.position).dot(camera.getWorldDirection(new THREE.Vector3()));
+          const unitsPerPixel = 2 * depth * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / host.clientHeight;
+          sprite.scale.set(52 * unitsPerPixel, 26 * unitsPerPixel, 1);
+        }
+        renderer.render(scene, camera);
+      });
+    } catch (cause) {
+      error.hidden = false;
+      error.textContent = '三维视图未能加载，请检查网络与 WebGL 支持。';
+      console.error(cause);
+    }
+  </script>
+</body>
+</html>
